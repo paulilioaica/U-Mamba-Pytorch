@@ -32,7 +32,7 @@ def run(batch_size, sequence_len, learning_rate,
         dataset = ShakespeareDataset(text, char_to_index=char_to_index, sequence_len=sequence_len)
         dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
         
-        model = Mamba(hidden_size, len(chars), rank, state_size, kernel_size, num_layers).cuda()
+        model = Mamba(hidden_size, len(chars), rank, state_size, kernel_size, num_layers)
         model = model.to(device)
 
         criterion = CrossEntropyLoss()
@@ -40,7 +40,7 @@ def run(batch_size, sequence_len, learning_rate,
         
         model = train(model, num_epochs, dataloader, optimizer, criterion, len(chars), device)
 
-        generate_text(model, "ROMEO:", char_to_index, index_to_char, gen_length=200, temperature=0.1)
+        generate_text(model, "ROMEO:", char_to_index, index_to_char, device, gen_length=200, temperature=0.1)
         
 
 if __name__ == "__main__":
@@ -54,3 +54,7 @@ if __name__ == "__main__":
         args.state_size, 
         args.kernel_size,
         args.device)
+    
+
+# local run:
+# python src/main.py --batch_size 64 --sequence_len 30 --learning_rate 0.001 --num_epochs 10 --num_layers 3 --hidden_size 64 --rank 3 --state_size 10 --kernel_size 3 --device cpu
