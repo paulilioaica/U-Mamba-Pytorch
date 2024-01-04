@@ -16,6 +16,7 @@ To get started with Transformer Plain, follow these steps:
 1. Clone the repository:
 
     ```shell
+    cd src/
     git clone https://github.com/paulilioaica/Mamba-Pytorch
     ```
 
