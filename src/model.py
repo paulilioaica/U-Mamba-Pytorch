@@ -1,6 +1,7 @@
 import torch.nn as nn
 import torch
 from einops import einsum
+
 class RMSNorm(nn.Module):
     def __init__(self, hidden_size, eps=1e-15):
         super().__init__()
@@ -32,12 +33,12 @@ class Mamba(nn.Module):
                                                  state_size=self.state_size,
                                                  kernel_size=self.kernel_size) for i in range(num_layers)])
     def forward(self, input_ids):
-
+        # Get embeddings for input_ids
         x = self.embedding(input_ids)
 
+        # Pass through the layers
         for layer in self.layers:
             x = layer(x)
-        
         x = self.norm(x)
         
         return self.linear(x)
@@ -83,74 +84,69 @@ class MambaLayer(nn.Module):
     def forward(self, x):
         batch_size, seq_length, hidden_size = x.shape
                 
-        # Apply an input projection layer to 'x', resulting in a tensor of shape (batch_size, seq_length, 2 * d_inner)
-        x_and_res = self.linear_in(x)
+        # shape (batch_size, seq_length, 2 * d_inner)
+        x_with_residual = self.linear_in(x)
 
-        # Split 'x_and_res' into two tensors 'x' and 'res', each with shape (batch_size, seq_length, d_inner)
-        x, res = x_and_res.split(split_size=[self.hidden_size, self.hidden_size], dim=-1)
+        # split x_with_residual into two tensors of shape (batch_size, seq_length, d_inner)
+        x, residual = x_with_residual.split(split_size=[self.hidden_size, self.hidden_size], dim=-1)
 
-        # Rearrange 'x' to shape (batch_size, d_inner, seq_length)
+        # rearrange x to shape (batch_size, d_inner, seq_length)
         x = x.permute(0, 2, 1)
 
-        # Apply a 1D convolution to 'x', then slice it to match the original sequence length
+        # convolution to x, then slice it to match the original sequence length
         x = self.conv(x)[:, :, :seq_length]
 
-        # Rearrange 'x' back to shape (batch_size, seq_length, d_inner)
+        # to shape (batch_size, seq_length, d_inner)
         x = x.permute(0, 2, 1)
 
-        # Apply the SiLU (Sigmoid Linear Unit) activation function to 'x'
+        # apply the silu 
         x = torch.nn.functional.silu(x)
 
-        # Apply a selective state model mechanism to 'x'
+        # selective state model mechanism to 'x
         y = self.ssm(x)
 
-        # Element-wise multiply 'y' and the SiLU activation of 'res'
-        y = y * torch.nn.functional.silu(res)
+        y = y * torch.nn.functional.silu(residual)
 
         output = self.linear_out(y)
         return output
 
     def ssm(self, x):
-        # Get the shapes
         hidden_size, n = self.A_log.shape
 
-        # Compute state space parameters
+        # compute A, D 
         A = -torch.exp(self.A_log.float())
         D = self.D.float()
-        x_dbl = self.linear_x(x)
 
-        # Split the tensor into three parts
+        # get delta B and C from input (specifically for mamba, not for general selective scan)
+        x_dbl = self.linear_x(x)
         delta, B, C = x_dbl.split(split_size=[self.rank, n, n], dim=-1)
         delta = torch.nn.functional.softplus(self.linear_dt(delta))
 
-        # Run the selective scan algorithm
+        # selective scan 
         y = self.selective_scan(x, delta, A, B, C, D)
         return y
 
     
     def selective_scan(self, u, delta, A, B, C, D):
-        # Get the shapes
         batch_size, sequence_length, hidden_size = u.shape
         n = A.shape[1]
 
         deltaA = torch.exp(einsum(delta, A, 'batch seq_length hidden_size, hidden_size n -> batch seq_length hidden_size n'))
         deltaB_u = einsum(delta, B, u, 'batch seq_length hidden_size, batch seq_length n, batch seq_length hidden_size -> batch seq_length hidden_size n')
 
-        # Initialize the state 'x'
+        # the state 
         x = torch.zeros((batch_size, hidden_size, n), device=deltaA.device)
 
-        # A list to store the output 'y' at each time step
         ys = []
 
-        # Perform selective scan
+        # selective scan (x = A * x + B * u, y = C * x)
         for i in range(sequence_length):
             x = deltaA[:, i, :] * x + deltaB_u[:, i, :]
             y = (x * C[:, i, :].unsqueeze(1)).sum(-1)
             ys.append(y)
 
-        # Stack 'ys' into a tensor along dimension 1
         y = torch.stack(ys, dim=1)
 
-        # Add 'u * D' to 'y'
+        # u * D to y
         y = y + u * D.unsqueeze(0).unsqueeze(0)
         return y
