@@ -31,4 +31,4 @@ def generate_text(model, start_string, char_to_index, index_to_char, device, gen
             probs = torch.softmax(output[:, -1, :], dim=-1)
             next_char_index = torch.multinomial(probs, num_samples=1).squeeze().item()
             input_text += index_to_char[next_char_index]
-    return input_text
+    print(input_text)
