@@ -17,7 +17,7 @@ def train(model, num_epochs, dataloader, optimizer, criterion, vocab_size, devic
             optimizer.step()  
             running_loss += loss.item()  
         print(f"Epoch {epoch+1} Loss: {running_loss/len(dataloader)}")  
-
+    return model
 
 
 def generate_text(model, start_string, char_to_index, index_to_char, device, gen_length=100, temperature=0.1, ):
