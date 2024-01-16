@@ -9,7 +9,7 @@ This is a PyTorch project that implements a minimalistic U-Mamba architecture [d
 
 The model is a replacement for convolutional-based image segmentation models based on state spaces.
 
-For more details architecture, refer to the original paper: [Mamba: Linear-Time Sequence Modeling with Selective State Spaces](https://arxiv.org/pdf/2401.04722.pdf).
+For more details architecture, refer to the original paper: [U-Mamba: Enhancing Long-range Dependency for Biomedical Image Segmentation](https://arxiv.org/pdf/2401.04722.pdf).
 
 ## Setup
 
