@@ -21,40 +21,4 @@ parser.add_argument("--device", type=str, default="cpu")
 args = parser.parse_args()
 
 
-
-def run(batch_size, sequence_len, learning_rate, 
-        num_epochs, num_layers, hidden_size, rank,
-        state_size, kernel_size, device):
-        
-
-        text, chars, char_to_index, index_to_char = get_data()
-        
-        dataset = ShakespeareDataset(text, char_to_index=char_to_index, sequence_len=sequence_len)
-        dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
-        
-        model = Mamba(hidden_size, len(chars), rank, state_size, kernel_size, num_layers)
-        model = model.to(device)
-
-        criterion = CrossEntropyLoss()
-        optimizer = Adam(model.parameters(), lr=learning_rate)
-        
-        model = train(model, num_epochs, dataloader, optimizer, criterion, len(chars), device)
-
-        generate_text(model, "ROMEO:", char_to_index, index_to_char, device, gen_length=200, temperature=0.1)
-        
-
-if __name__ == "__main__":
-    run(args.batch_size, 
-        args.sequence_len, 
-        args.learning_rate, 
-        args.num_epochs, 
-        args.num_layers, 
-        args.hidden_size, 
-        args.rank, 
-        args.state_size, 
-        args.kernel_size,
-        args.device)
-    
-
-# local run:
-# python src/main.py --batch_size 64 --sequence_len 30 --learning_rate 0.001 --num_epochs 10 --num_layers 3 --hidden_size 64 --rank 3 --state_size 10 --kernel_size 3 --device cpu
+#TBD
