@@ -14,6 +14,12 @@ class U_Mamba(nn.Module):
         self.kernel_size = kernel_size
         self.num_layers = num_layers
 
+        # assert width, height and hidden size are divisible by 2 ** num_layers
+        assert width % 2 ** num_layers == 0, "width must be divisible by 2 ** num_layers"
+        assert height % 2 ** num_layers == 0, "height must be divisible by 2 ** num_layers"
+        assert hidden_size % 2 ** num_layers == 0, "hidden_size must be divisible by 2 ** num_layers"
+
+
         self.downscale_layers = nn.ModuleList([U_MambaBlockDownscale(channels=self.channels,
                                                  rank=self.rank,
                                                  state_size=self.state_size,
