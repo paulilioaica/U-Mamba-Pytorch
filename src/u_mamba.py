@@ -7,7 +7,7 @@ from einops import einsum
 class U_Mamba(nn.Module):
     def __init__(self, channels, width, height, hidden_size, rank, state_size, kernel_size, num_layers):
         super().__init__()
-        self.hidden_size = hidden_size * 2
+        self.hidden_size = hidden_size
         self.rank = rank
         self.channels = channels
         self.state_size = state_size
@@ -15,42 +15,45 @@ class U_Mamba(nn.Module):
         self.num_layers = num_layers
 
         self.downscale_layers = nn.ModuleList([U_MambaBlockDownscale(channels=self.channels,
-                                                 hidden_size=self.hidden_size,
                                                  rank=self.rank,
                                                  state_size=self.state_size,
                                                  kernel_size=self.kernel_size,
-                                                 width=width,
-                                                 height=height) for i in range(num_layers)])
+                                                 hidden_size=self.hidden_size // 2 ** i,
+                                                 width=width // 2 ** i,
+                                                 height=height // 2 ** i) for i in range(num_layers)])
         
         self.upscale_layers = nn.ModuleList([U_MambaBlockUpscale(channels=self.channels,
-                                            hidden_size=self.hidden_size,
                                             rank=self.rank,
                                             state_size=self.state_size,
                                             kernel_size=self.kernel_size,
-                                            width=width,
-                                            height=height) for i in range(num_layers)])
+                                            hidden_size=self.hidden_size // (2 ** i),
+                                            width=width // 2 ** i,
+                                            height=height // 2 ** i) for i in range(num_layers, 0, -1)])
         
+
+            
     def forward(self, x):
-        # Get embeddings for input_ids
         activation_history = []
 
         # Pass through the layers, save for residual 
 
         for layer in self.downscale_layers:
+
             x = layer(x)
             activation_history.append(x)
 
         for layer in self.upscale_layers:
+
             x = x + activation_history.pop()
             x = layer(x)
         
-        return self.linear(x)
+        return x
 
 
 class U_MambaBlockUpscale(nn.Module):
     def __init__(self, channels, width, height, hidden_size, rank, state_size, kernel_size):
         super().__init__()
-        self.mamba = U_MambaLayer(channels=channels,
+        self.layer = U_MambaLayer(channels=channels,
                                 hidden_size=hidden_size,
                                 width=width,
                                 height=height, 
@@ -65,7 +68,7 @@ class U_MambaBlockUpscale(nn.Module):
         
 
     def forward(self, x):
-        x = self.mamba(x)
+        x = self.layer(x)
         x = self.upscale_conv(x)
         return x
 
@@ -96,6 +99,8 @@ class U_MambaLayer(nn.Module):
     def __init__(self, channels, hidden_size, width, height, rank, state_size, kernel_size):
         super().__init__()
         self.channels = channels
+        self.width = width
+        self.height = height
         self.hidden_size = hidden_size
         self.rank = rank
         self.state_size = state_size
@@ -111,7 +116,6 @@ class U_MambaLayer(nn.Module):
         self.conv1d = nn.Conv1d(in_channels=self.channels,
                               out_channels=self.channels,
                               kernel_size=self.kernel_size,
-                            #   groups=self.hidden_size,
                               padding=(self.kernel_size - 1)//2)
         
         self.linear_dt = nn.Linear(rank, signal_length)
@@ -216,3 +220,18 @@ class U_MambaLayer(nn.Module):
         # u * D to y
         y = y + u * D.unsqueeze(0).unsqueeze(0)
         return y
+    
+
+
+
+
+# channels = 3
+# hidden_size = 16
+# width = 16
+# height = 16
+# rank = 4
+# state_size = 4
+# kernel_size = 3
+
+# model = U_Mamba(channels=channels, width=width, height=height, hidden_size=hidden_size, rank=rank, state_size=state_size, kernel_size=kernel_size, num_layers=3)
+# model(x).shape == x.shape
