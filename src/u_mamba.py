@@ -5,7 +5,7 @@ from einops import einsum
 
 
 class U_Mamba(nn.Module):
-    def __init__(self, channels, width, height, hidden_size, rank, state_size, kernel_size, num_layers):
+    def __init__(self, channels, width, height, hidden_size, rank, state_size, kernel_size, num_layers, target_classes=2):
         super().__init__()
         self.hidden_size = hidden_size
         self.rank = rank
@@ -36,12 +36,14 @@ class U_Mamba(nn.Module):
                                             width=width // 2 ** i,
                                             height=height // 2 ** i) for i in range(num_layers, 0, -1)])
         
+        self.linear_in = nn.Linear(1, self.hidden_size)
+        self.linear_out = nn.Linear(self.hidden_size, target_classes)
 
-            
     def forward(self, x):
         activation_history = []
 
         # Pass through the layers, save for residual 
+        x = self.linear_in(x)
 
         for layer in self.downscale_layers:
 
@@ -53,7 +55,7 @@ class U_Mamba(nn.Module):
             x = x + activation_history.pop()
             x = layer(x)
         
-        return x
+        return torch.sigmoid(self.linear_out(x))
 
 
 class U_MambaBlockUpscale(nn.Module):
@@ -69,7 +71,7 @@ class U_MambaBlockUpscale(nn.Module):
         self.upscale_conv = nn.ConvTranspose3d(in_channels=channels,
                                         out_channels=channels,
                                         kernel_size=2,
-                                        stride = 2,
+                                        stride=2,
                                         padding=0)
         
 
@@ -229,15 +231,3 @@ class U_MambaLayer(nn.Module):
     
 
 
-
-
-# channels = 3
-# hidden_size = 16
-# width = 16
-# height = 16
-# rank = 4
-# state_size = 4
-# kernel_size = 3
-
-# model = U_Mamba(channels=channels, width=width, height=height, hidden_size=hidden_size, rank=rank, state_size=state_size, kernel_size=kernel_size, num_layers=3)
-# model(x).shape == x.shape
