@@ -37,6 +37,7 @@ class U_Mamba(nn.Module):
                                             height=height // 2 ** i) for i in range(num_layers, 0, -1)])
         
         self.linear_in = nn.Linear(1, self.hidden_size)
+        self.linear_channel = nn.Linear(self.channels * self.hidden_size, self.hidden_size)
         self.linear_out = nn.Linear(self.hidden_size, target_classes)
 
     def forward(self, x):
@@ -55,7 +56,7 @@ class U_Mamba(nn.Module):
             x = x + activation_history.pop()
             x = layer(x)
         
-        return torch.sigmoid(self.linear_out(x))
+        return self.linear_out(x)
 
 
 class U_MambaBlockUpscale(nn.Module):
